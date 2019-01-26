@@ -164,13 +164,6 @@ bool clearValueFromColExceptRows(int h, int c, set<int> allowed) {
   return erased;
 }
 
-void setCell(int r, int c, int h) {
-  g[r][c] = h;
-  clearValueFromColExceptRows(h, c, set<int>());
-  clearValueFromRowExceptCols(h, r, set<int>());
-  clearValueFromSquareExceptCells(h, r / 3, c / 3, set<pair<int, int> > ());
-}
-
 bool solved() {
   set<int> rows[N], cols[N], squares[3][3];
   for (int i = 0; i < N; ++i) {
@@ -218,6 +211,21 @@ pair<bool, Failure> valid() {
     }  
   }
   return {true, Failure{ValidationFailureReason::VALID, -1, -1}};
+}
+
+void setCell(int r, int c, int h) {
+  g[r][c] = h;
+  clearValueFromColExceptRows(h, c, set<int>());
+  clearValueFromRowExceptCols(h, r, set<int>());
+  clearValueFromSquareExceptCells(h, r / 3, c / 3, set<pair<int, int> > ());
+  if (DEBUG_MODE) {
+    auto is_valid = valid();
+    if (!is_valid.first) {
+      displayHints(r, c);
+      cerr << is_valid.second.reason << " " << is_valid.second.r << " " << is_valid.second.c << endl;
+      assert(false);
+    }  
+  }
 }
 
 bool existsInRow(int r, int v) {
@@ -369,11 +377,6 @@ bool hiddenSinglesByRow(int r, int c) {
     if (getPossibleOccurancesInRow(r, h) == 1) {
       setCell(r, c, h);
       log("hidden_single_row", r, c, h);
-      auto is_valid = valid();
-      if (!is_valid.first) {
-        cerr << is_valid.second.reason << " " << is_valid.second.r << " " << is_valid.second.c << endl;
-        assert(false);
-      }
       return true;
     }
   }
@@ -388,11 +391,6 @@ bool hiddenSinglesByCol(int r, int c) {
     if (getPossibleOccurancesInCol(c, h) == 1) {
       setCell(r, c, h);
       log("hidden_single_col", r, c, h);
-      auto is_valid = valid();
-      if (!is_valid.first) {
-        cerr << is_valid.second.reason << " " << is_valid.second.r << " " << is_valid.second.c << endl;
-        assert(false);
-      }
       return true;
     }
   }
@@ -407,12 +405,6 @@ bool hiddenSinglesBySquare(int r, int c) {
     if (getPossibleOccurancesInSquare(r / 3, c / 3, h) == 1) {
       setCell(r, c, h);
       log("hidden_single_square", r, c, h);
-      auto is_valid = valid();
-      if (!is_valid.first) {
-        displayHints(r, c);
-        cerr << is_valid.second.reason << " " << is_valid.second.r << " " << is_valid.second.c << endl;
-        assert(false);
-      }
       return true;
     }
   }
@@ -423,11 +415,6 @@ bool nakedSingle(int r, int c) {
   if (possible[r][c].size() == 1) {
     setCell(r, c, *possible[r][c].begin());
     log("naked_single", r, c, g[r][c]);
-    auto is_valid = valid();
-    if (!is_valid.first) {
-      cerr << is_valid.second.reason << " " << is_valid.second.r << " " << is_valid.second.c << endl;
-      assert(false);
-    }
     return true;
   }
   return false;
