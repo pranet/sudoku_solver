@@ -29,11 +29,147 @@ void displayHints(int r, int c) {
   cerr << endl;
 }
 
+void displayHintsForRow(int r) {
+  for (int c = 0; c < N; ++c) {
+    displayHints(r, c);
+  }
+}
+
+void displayHintsForCol(int c) {
+  for (int r = 0; r < N; ++r) {
+    displayHints(r, c);
+  }
+}
+
+void displayHintsForSquare(int sr, int sc) {
+  int r_low = sr * 3;
+  int r_high = r_low + 3;
+  int c_low = sc * 3;
+  int c_high = c_low + 3;
+  for (int r = r_low; r < r_high; ++r) {
+    for (int c = c_low; c < c_high; ++c) {
+      displayHints(r, c);
+    }
+  }
+}
+
 void log(string s, int r, int c, int h) {
   if (DEBUG_MODE) {
     cerr << s << " " << r << " " << c << " " << h << endl;
   }
 } 
+
+bool eraseValuesFromCells(set<int> value, set<pair<int, int> > cells) {
+  bool atleast_one_erased = false;
+  for (auto cell : cells) {
+    int r = cell.first;
+    int c = cell.second;
+    for (auto v : value) {
+      atleast_one_erased |= possible[r][c].erase(v);
+    }
+  }
+  return atleast_one_erased;
+}
+
+vector<pair<int, int> > getUnassignedCellsForRow(int r) {
+  vector<pair<int, int> > ret;
+  for (int c = 0; c < N; ++c) {
+    if (g[r][c] == 0) {
+      ret.push_back({r, c});
+    }
+  }
+  return ret;
+}
+
+vector<pair<int, int> > getUnassignedCellsForCol(int c) {
+  vector<pair<int, int> > ret;
+  for (int r = 0; r < N; ++r) {
+    if (g[r][c] == 0) {
+      ret.push_back({r, c});
+    }
+  }
+  return ret;
+}
+
+vector<pair<int, int> > getUnassignedCellsForSquare(int sr, int sc) {
+  int r_low = sr * 3;
+  int r_high = r_low + 3;
+  int c_low = sc * 3;
+  int c_high = c_low + 3;
+  vector<pair<int, int> > ret;
+  for (int r = r_low; r < r_high; ++r) {
+    for (int c = c_low; c < c_high; ++c) {
+      if (g[r][c] == 0) {
+        ret.push_back({r, c});
+      }
+    }  
+  }
+  return ret;
+}
+
+bool clearValueFromSquareExceptCells(int h, int sr, int sc, set<pair<int, int> > allowed) {
+  bool erased = false;
+  int r_low = sr * 3;
+  int r_high = r_low + 3;
+  int c_low = sc * 3;
+  int c_high = c_low + 3;
+  for (int r = r_low; r < r_high; ++r) {
+    for (int c = c_low; c < c_high; ++c) {
+      if (allowed.find({r, c}) != allowed.end()) {
+        continue;
+      }
+      if (g[r][c] > 0) {
+        continue;
+      }
+      erased |= possible[r][c].erase(h);
+    }
+  }
+  if (erased) {
+    log("erased_from_square", sr, sc, h);
+  }
+  return erased;
+}
+
+bool clearValueFromRowExceptCols(int h, int r, set<int> allowed) {
+  bool erased = false;
+  for (int c = 0; c < N; ++c) {
+    if (allowed.find(c) != allowed.end()) {
+      continue;
+    }
+    if (g[r][c] > 0) {
+      continue;
+    }
+    erased |= possible[r][c].erase(h);
+  }
+  if (erased) {
+    log("erased_from_row", r, -1, h);
+  }
+  return erased;
+}
+
+bool clearValueFromColExceptRows(int h, int c, set<int> allowed) {
+  bool erased = false;
+  for (int r = 0; r < N; ++r) {
+    if (allowed.find(r) != allowed.end()) {
+      continue;
+    }
+    if (g[r][c] > 0) {
+      continue;
+    }
+    erased |= possible[r][c].erase(h);
+  }
+  if (erased) {
+    log("erased_from_col", -1, c, h);
+  }
+  return erased;
+}
+
+void setCell(int r, int c, int h) {
+  g[r][c] = h;
+  clearValueFromColExceptRows(h, c, set<int>());
+  clearValueFromRowExceptCols(h, r, set<int>());
+  clearValueFromSquareExceptCells(h, r / 3, c / 3, set<pair<int, int> > ());
+}
 
 bool solved() {
   set<int> rows[N], cols[N], squares[3][3];
@@ -231,7 +367,7 @@ int getPossibleOccurancesInSquare(int sr, int sc, int h) {
 bool hiddenSinglesByRow(int r, int c) {
   for (int h : possible[r][c]) {
     if (getPossibleOccurancesInRow(r, h) == 1) {
-      g[r][c] = h;
+      setCell(r, c, h);
       log("hidden_single_row", r, c, h);
       auto is_valid = valid();
       if (!is_valid.first) {
@@ -250,7 +386,7 @@ bool hiddenSinglesByRow(int r, int c) {
 bool hiddenSinglesByCol(int r, int c) {
   for (int h : possible[r][c]) {
     if (getPossibleOccurancesInCol(c, h) == 1) {
-      g[r][c] = h;
+      setCell(r, c, h);
       log("hidden_single_col", r, c, h);
       auto is_valid = valid();
       if (!is_valid.first) {
@@ -269,7 +405,7 @@ bool hiddenSinglesByCol(int r, int c) {
 bool hiddenSinglesBySquare(int r, int c) {
   for (int h : possible[r][c]) {
     if (getPossibleOccurancesInSquare(r / 3, c / 3, h) == 1) {
-      g[r][c] = h;
+      setCell(r, c, h);
       log("hidden_single_square", r, c, h);
       auto is_valid = valid();
       if (!is_valid.first) {
@@ -285,7 +421,7 @@ bool hiddenSinglesBySquare(int r, int c) {
 
 bool nakedSingle(int r, int c) {
   if (possible[r][c].size() == 1) {
-    g[r][c] = *possible[r][c].begin();
+    setCell(r, c, *possible[r][c].begin());
     log("naked_single", r, c, g[r][c]);
     auto is_valid = valid();
     if (!is_valid.first) {
@@ -316,63 +452,6 @@ bool processSingles() {
     }    
   }
   return solved;
-}
-
-bool clearValueFromSquareExceptCells(int h, int sr, int sc, set<pair<int, int> > allowed) {
-  bool erased = false;
-  int r_low = sr * 3;
-  int r_high = r_low + 3;
-  int c_low = sc * 3;
-  int c_high = c_low + 3;
-  for (int r = r_low; r < r_high; ++r) {
-    for (int c = c_low; c < c_high; ++c) {
-      if (allowed.find({r, c}) != allowed.end()) {
-        continue;
-      }
-      if (g[r][c] > 0) {
-        continue;
-      }
-      erased |= possible[r][c].erase(h);
-    }
-  }
-  if (erased) {
-    log("erased_from_square", sr, sc, h);
-  }
-  return erased;
-}
-
-bool clearValueFromRowExceptCols(int h, int r, set<int> allowed) {
-  bool erased = false;
-  for (int c = 0; c < N; ++c) {
-    if (allowed.find(c) != allowed.end()) {
-      continue;
-    }
-    if (g[r][c] > 0) {
-      continue;
-    }
-    erased |= possible[r][c].erase(h);
-  }
-  if (erased) {
-    log("erased_from_row", r, -1, h);
-  }
-  return erased;
-}
-
-bool clearValueFromColExceptRows(int h, int c, set<int> allowed) {
-  bool erased = false;
-  for (int r = 0; r < N; ++r) {
-    if (allowed.find(r) != allowed.end()) {
-      continue;
-    }
-    if (g[r][c] > 0) {
-      continue;
-    }
-    erased |= possible[r][c].erase(h);
-  }
-  if (erased) {
-    log("erased_from_col", -1, c, h);
-  }
-  return erased;
 }
 
 bool processPointingForSquare(int sr, int sc) {
@@ -507,60 +586,13 @@ bool processClaiming() {
   return solved;
 }
 
-bool eraseValuesFromCells(set<int> value, set<pair<int, int> > cells) {
-  bool atleast_one_erased = false;
-  for (auto cell : cells) {
-    int r = cell.first;
-    int c = cell.second;
-    for (auto v : value) {
-      atleast_one_erased |= possible[r][c].erase(v);
-    }
-  }
-  return atleast_one_erased;
-}
-
-vector<pair<int, int> > getUnassignedCellsForRow(int r) {
-  vector<pair<int, int> > ret;
-  for (int c = 0; c < N; ++c) {
-    if (g[r][c] == 0) {
-      ret.push_back({r, c});
-    }
-  }
-  return ret;
-}
-
-vector<pair<int, int> > getUnassignedCellsForCol(int c) {
-  vector<pair<int, int> > ret;
-  for (int r = 0; r < N; ++r) {
-    if (g[r][c] == 0) {
-      ret.push_back({r, c});
-    }
-  }
-  return ret;
-}
-
-vector<pair<int, int> > getUnassignedCellsForSquare(int sr, int sc) {
-  int r_low = sr * 3;
-  int r_high = r_low + 3;
-  int c_low = sc * 3;
-  int c_high = c_low + 3;
-  vector<pair<int, int> > ret;
-  for (int r = r_low; r < r_high; ++r) {
-    for (int c = c_low; c < c_high; ++c) {
-      if (g[r][c] == 0) {
-        ret.push_back({r, c});
-      }
-    }  
-  }
-  return ret;
-}
 
 bool processHiddenSubsets(vector<pair<int, int> > cells) {
   bool atleast_one_erased = false;
   for (int mask = 1; mask < (1 << cells.size()); ++mask) {
     int number_of_cells = __builtin_popcount(mask);
     set<int> distinct_values;
-    set<pair<int, int> > unselected_cells;
+    set<pair<int, int> > unselected_cells, selected_cells;
     for (int j = 0; j < cells.size(); ++j) {
       if (mask & (1 << j)) {
         int r = cells[j].first;
@@ -568,6 +600,7 @@ bool processHiddenSubsets(vector<pair<int, int> > cells) {
         for (auto h : possible[r][c]) {
           distinct_values.insert(h);
         }
+        selected_cells.insert(cells[j]);
       } else {
         unselected_cells.insert(cells[j]);
       }
@@ -692,7 +725,21 @@ void testAllSingles(const int source[N][N]) {
     progress = refreshHints();
     progress |= processSingles();
   }
+  assert(solved());
+}
 
+void testAllStrategies(const int source[N][N]) {
+  readGrid(source);
+  populateHints();
+  bool progress = true;
+  int iterations = 100;
+  while (iterations-- > 0 and progress and !solved()) {
+    progress = refreshHints();
+    progress |= processSingles();
+    progress |= processPointing();
+    progress |= processClaiming();
+    progress |= processHiddenSubsets();
+  }
   assert(solved());
 }
 
@@ -759,30 +806,13 @@ void mediumTests() {
   testAllSingles(medium);
 }
 
+void hardTests() {
+  testAllStrategies(hard);
+}
 
 int main() {
   breezyTests();
   easyTests();
   mediumTests();
-
-  readGrid(hard);
-  populateHints();
-  bool progress = true;
-  int iterations = 100;
-  while (iterations-- > 0 and progress and !solved()) {
-    progress = refreshHints();
-    progress |= processSingles();
-    refreshHints();
-    progress |= processPointing();
-    refreshHints();
-    progress |= processClaiming();
-    refreshHints();
-    progress |= processHiddenSubsets();
-  }
-  cout << iterations << endl;
-  display();
-  if (!solved()) {
-    assert(false);
-  }
-
+  hardTests();
 }
