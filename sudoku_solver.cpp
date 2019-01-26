@@ -1,13 +1,11 @@
 //Pranet Verma
 #include <bits/stdc++.h>
 using namespace std;
-int DEBUG = false;
-const int N = 9;
 
+const int N = 9;
 
 int g[N][N];
 unordered_set<int> possible[N][N];
-
 
 void display() {
   for (int i = 0; i < N; ++i) {
