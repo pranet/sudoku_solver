@@ -318,28 +318,33 @@ bool processSingles() {
   return solved;
 }
 
-
-bool clearValueFromRowExceptCols(int h, int r, int cl, int ch) {
+bool clearValueFromSquareExceptCells(int h, int sr, int sc, set<pair<int, int> > allowed) {
   bool erased = false;
-  for (int c = 0; c < N; ++c) {
-    if (c >= cl and c < ch) {
-      continue;
+  int r_low = sr * 3;
+  int r_high = r_low + 3;
+  int c_low = sc * 3;
+  int c_high = c_low + 3;
+  for (int r = r_low; r < r_high; ++r) {
+    for (int c = c_low; c < c_high; ++c) {
+      if (allowed.find({r, c}) != allowed.end()) {
+        continue;
+      }
+      if (g[r][c] > 0) {
+        continue;
+      }
+      erased |= possible[r][c].erase(h);
     }
-    if (g[r][c] > 0) {
-      continue;
-    }
-    erased |= possible[r][c].erase(h);
   }
   if (erased) {
-    log("erased", r, -1, h);
+    log("erased_from_square", sr, sc, h);
   }
   return erased;
 }
 
-bool clearValueFromColExceptRows(int h, int c, int rl, int rh) {
+bool clearValueFromRowExceptCols(int h, int r, set<int> allowed) {
   bool erased = false;
-  for (int r = 0; r < N; ++r) {
-    if (r >= rl and r < rh) {
+  for (int c = 0; c < N; ++c) {
+    if (allowed.find(c) != allowed.end()) {
       continue;
     }
     if (g[r][c] > 0) {
@@ -348,7 +353,24 @@ bool clearValueFromColExceptRows(int h, int c, int rl, int rh) {
     erased |= possible[r][c].erase(h);
   }
   if (erased) {
-    log("erased", -1, c, h);
+    log("erased_from_row", r, -1, h);
+  }
+  return erased;
+}
+
+bool clearValueFromColExceptRows(int h, int c, set<int> allowed) {
+  bool erased = false;
+  for (int r = 0; r < N; ++r) {
+    if (allowed.find(r) != allowed.end()) {
+      continue;
+    }
+    if (g[r][c] > 0) {
+      continue;
+    }
+    erased |= possible[r][c].erase(h);
+  }
+  if (erased) {
+    log("erased_from_col", -1, c, h);
   }
   return erased;
 }
@@ -373,20 +395,20 @@ bool processPointingForSquare(int sr, int sc) {
   for (int h = 1; h <= N; ++h) {
     if (rows[h].size() == 1) {
       int r = *rows[h].begin();
-      change |= clearValueFromRowExceptCols(h, r, c_low, c_high);
+      change |= clearValueFromRowExceptCols(h, r, set<int> {c_low, c_low + 1, c_low + 2});
     }
     if (cols[h].size() == 1) {
       int c = *cols[h].begin();
-      change |= clearValueFromColExceptRows(h, c, r_low, r_high);
+      change |= clearValueFromColExceptRows(h, c, set<int> {r_low, r_low + 1, r_low + 2});
     }
   }
   return change;
 }
 
 /*
- *  Detects whether a hint value is the only possible one in row or column of a
+ *  Detects whether a hint value is the only possible in one row or column of a
  *  given square. 
- *  If so, remove it as a possibility from that row / column outside the box  
+ *  If so, remove it as a possibility from that row / column outside the square 
  */
 bool processPointing() {
   bool solved = false;
@@ -396,6 +418,194 @@ bool processPointing() {
   return solved;
 }
 
+
+set<pair<int, int> > getRowSquareIntersection(int r, int sr, int sc) {
+  int r_low = sr * 3;
+  int r_high = r_low + 3;
+  int c_low = sc * 3;
+  int c_high = c_low + 3;
+  if (r >= r_low and r < r_high) {
+    set<pair<int, int> > ret;
+    for (int c = c_low; c < c_high; ++c) {
+      ret.insert({r, c});
+    }
+    return ret;
+  }
+  assert(false);
+}
+
+set<pair<int, int> > getColSquareIntersection(int c, int sr, int sc) {
+  int r_low = sr * 3;
+  int r_high = r_low + 3;
+  int c_low = sc * 3;
+  int c_high = c_low + 3;
+  if (c >= c_low and c < c_high) {
+    set<pair<int, int> > ret;
+    for (int r = r_low; r < r_high; ++r) {
+      ret.insert({r, c});
+    }
+    return ret;
+  }
+  assert(false);
+}
+
+bool processClaimingForRow(int r) {
+  set<pair<int, int> > squares[10];
+  for (int c = 0; c < N; ++c) {
+    if (g[r][c] == 0) {
+      for (auto h : possible[r][c]) {
+        squares[h].insert({r / 3, c / 3});
+      }
+    }
+  }
+
+  bool change = false;
+  for (int h = 1; h <= N; ++h) {
+    if (squares[h].size() == 1) {
+      int sr = squares[h].begin()->first;
+      int sc = squares[h].begin()->second;
+      change |= clearValueFromSquareExceptCells(h, sr, sc, getRowSquareIntersection(r, sr, sc));
+    }
+  }
+  return change;
+}
+
+bool processClaimingForCol(int c) {
+  set<pair<int, int> > squares[10];
+  for (int r = 0; r < N; ++r) {
+    if (g[r][c] == 0) {
+      for (auto h : possible[r][c]) {
+        squares[h].insert({r / 3, c / 3});
+      }
+    }
+  }
+
+  bool change = false;
+  for (int h = 1; h <= N; ++h) {
+    if (squares[h].size() == 1) {
+      int sr = squares[h].begin()->first;
+      int sc = squares[h].begin()->second;
+      change |= clearValueFromSquareExceptCells(h, sr, sc, getColSquareIntersection(c, sr, sc));
+    }
+  }
+  return change;
+}
+
+/*
+ *  Detects whether a hint value is the only possible in one square for a given
+ *  of row/column 
+ *  If so, remove it as a possibility from all other rows of that square 
+ */
+bool processClaiming() {
+  bool solved = false;
+  for (int r = 0; r < N; ++r) {
+    solved |= processClaimingForRow(r);
+  }
+  for (int c = 0; c < N; ++c) {
+    solved |= processClaimingForCol(c);
+  }
+  return solved;
+}
+
+bool eraseValuesFromCells(set<int> value, set<pair<int, int> > cells) {
+  bool atleast_one_erased = false;
+  for (auto cell : cells) {
+    int r = cell.first;
+    int c = cell.second;
+    for (auto v : value) {
+      atleast_one_erased |= possible[r][c].erase(v);
+    }
+  }
+  return atleast_one_erased;
+}
+
+vector<pair<int, int> > getUnassignedCellsForRow(int r) {
+  vector<pair<int, int> > ret;
+  for (int c = 0; c < N; ++c) {
+    if (g[r][c] == 0) {
+      ret.push_back({r, c});
+    }
+  }
+  return ret;
+}
+
+vector<pair<int, int> > getUnassignedCellsForCol(int c) {
+  vector<pair<int, int> > ret;
+  for (int r = 0; r < N; ++r) {
+    if (g[r][c] == 0) {
+      ret.push_back({r, c});
+    }
+  }
+  return ret;
+}
+
+vector<pair<int, int> > getUnassignedCellsForSquare(int sr, int sc) {
+  int r_low = sr * 3;
+  int r_high = r_low + 3;
+  int c_low = sc * 3;
+  int c_high = c_low + 3;
+  vector<pair<int, int> > ret;
+  for (int r = r_low; r < r_high; ++r) {
+    for (int c = c_low; c < c_high; ++c) {
+      if (g[r][c] == 0) {
+        ret.push_back({r, c});
+      }
+    }  
+  }
+  return ret;
+}
+
+bool processHiddenSubsets(vector<pair<int, int> > cells) {
+  bool atleast_one_erased = false;
+  for (int mask = 1; mask < (1 << cells.size()); ++mask) {
+    int number_of_cells = __builtin_popcount(mask);
+    set<int> distinct_values;
+    set<pair<int, int> > unselected_cells;
+    for (int j = 0; j < cells.size(); ++j) {
+      if (mask & (1 << j)) {
+        int r = cells[j].first;
+        int c = cells[j].second;
+        for (auto h : possible[r][c]) {
+          distinct_values.insert(h);
+        }
+      } else {
+        unselected_cells.insert(cells[j]);
+      }
+    } 
+    assert (distinct_values.size() >= number_of_cells);
+    if (distinct_values.size() == number_of_cells) {
+      atleast_one_erased |= eraseValuesFromCells(distinct_values, unselected_cells);
+    }
+  }
+  return atleast_one_erased;
+}
+
+bool processHiddenSubsetsForRow(int r) {
+  return processHiddenSubsets(getUnassignedCellsForRow(r));
+}
+
+bool processHiddenSubsetsForCol(int c) {
+  return processHiddenSubsets(getUnassignedCellsForCol(c));
+}
+
+bool processHiddenSubsetsForSquare(int sr, int sc) {
+  return processHiddenSubsets(getUnassignedCellsForSquare(sr, sc));
+}
+
+/**
+ *  Detects a subset of X cells with contains exactly X distinct elements.
+ *  If such a subset exists, we can erase those elements from all other cells in that
+ *  row, col or square.
+ */
+bool processHiddenSubsets() {
+  bool solved = false;
+  for (int i = 0; i < N; ++i) {
+    solved |= processHiddenSubsetsForRow(i);
+    solved |= processHiddenSubsetsForCol(i);
+    solved |= processHiddenSubsetsForSquare(i / 3, i % 3);
+  }
+  return solved;
+}
 
 // should be solvable using only one of the 4 single strategies
 void testNakedSingle(const int source[N][N]) {
@@ -562,8 +772,14 @@ int main() {
   while (iterations-- > 0 and progress and !solved()) {
     progress = refreshHints();
     progress |= processSingles();
+    refreshHints();
     progress |= processPointing();
+    refreshHints();
+    progress |= processClaiming();
+    refreshHints();
+    progress |= processHiddenSubsets();
   }
+  cout << iterations << endl;
   display();
   if (!solved()) {
     assert(false);
